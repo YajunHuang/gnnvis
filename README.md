@@ -6,7 +6,7 @@ run mnist example:
 python -m experiments.train --batch-size=2 --k=20 --dsize=10000 --psize=200 --dataset=mnist
 ```
 
-#### Project file tree
+Project file tree
 ```
  📦GNNVis
  ┣ 📂data
