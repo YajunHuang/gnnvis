@@ -35,14 +35,11 @@ python -m experiments.train --batch-size=2 --k=20 --dsize=10000 --psize=200 --da
  ┃ ┣ 📜knnmodule.cpp
  ┃ ┣ 📜setup.py
  ┃ ┗ 📜sparse.py
- ┣ 📂tests
- ┃ ┣ 📜mnist_graph.py
- ┃ ┗ 📜test_knn.py
  ┣ 📂utils
  ┃ ┣ 📜eval.py
  ┃ ┣ 📜metrics.py
  ┃ ┗ 📜plot.py
- ┗ 📜readme.md
+ ┗ 📜README.md
 ```
 
 install networkx 2.3, since metis dependent it.
