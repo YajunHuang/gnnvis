@@ -5,8 +5,9 @@ from data import register_data_args
 from data.mnist import MNISTDataset
 
 
-def split_dataset(args):
-    split_rates = [5, 3, 2]
+def split_dataset(args, split_rates=None):
+    if split_rates is None:
+        split_rates = [8, 1, 1]
     mnist = MNISTDataset(data_dir = args.data_dir, n_samples=args.dsize, k=args.k, split_rates=split_rates)
     mnist.make_sparse_graph_npz()
 
@@ -61,6 +62,8 @@ if __name__ == '__main__':
     parser.add_argument("--data_dir", type=str, default='datasets',
                         help="the dataset directory")
     parser.add_argument("--k", type=int, default=30,
+                        help="k nearest neighbors")
+    parser.add_argument("--neg-sample", type=int, default=2,
                         help="k nearest neighbors")
 
     args = parser.parse_args()

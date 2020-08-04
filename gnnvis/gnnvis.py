@@ -9,9 +9,8 @@ import dgl
 import numpy as np
 import torch
 import torch.nn.functional as F
-from sklearn import preprocessing
 
-from data import load_knn_dataset, MNISTDataset
+from data import load_knn_dataset
 from .sampler import ClusterIter
 from .gat import GAT
 from .loss import TSNELoss
@@ -31,7 +30,16 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
     with open(os.path.join(result_dir, 'args.txt'), 'w') as fh:
         json.dump(args.__dict__, fh, indent=4)
 
-    g, features, labels, P = load_knn_dataset(args=args, split_part=data_split_part, data_dir=data_dir)
+    features, labels, P = load_knn_dataset(args=args, split_part=data_split_part, data_dir=data_dir)
+    g = dgl.DGLGraph()
+    g.from_scipy_sparse_matrix(P)
+
+    g.ndata['features'] = features
+    g.ndata['labels'] = labels
+    # add edge weights
+    coo_matrix = P.tocoo()
+    g.edata['weight'] = torch.LongTensor(coo_matrix.data)   # why used to multiply 1000
+
     in_feats = features.shape[1]
     n_classes = 2
     n_edges = g.number_of_edges()
@@ -57,7 +65,12 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
         P = P.cuda()
         print("use cuda:", args.gpu)
 
-    cluster_iterator = ClusterIter(g, args.psize, args.batch_size, 
+    # cluster_iterator = ClusterIter(g, args.psize, args.batch_size, 
+    #                                seed_nid = None, 
+    #                                use_pp = False)
+    cluster_iterator = ClusterIter(dn=None, g=g, 
+                                   psize=args.psize, 
+                                   batch_size=args.batch_size, 
                                    seed_nid = None, 
                                    use_pp = False)
 
@@ -96,6 +109,8 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
     for epoch in range(1, args.n_epochs + 1):
         dur = []
         loss_values = []
+        num_pos_edges = []
+        num_neg_edges = []
         total_iter = 0
         for j, cluster in enumerate(cluster_iterator):
             t0 = time.time()
@@ -113,7 +128,7 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
                                                                 # num_workers=1,
                                                                 reset=True,
                                                                 exclude_positive=True,
-                                                                neg_sample_size=1).__iter__())
+                                                                neg_sample_size=args.neg_sample).__iter__())
             cluster_nids = torch.unique(torch.cat([pos_g.parent_nid, neg_g.parent_nid]))
             # print("Edge of pos_g, neg_g: ", pos_g.parent_eid.shape, neg_g.parent_eid.shape)
             # print("Node of pos_g, neg_g, cluster_nids: ", pos_g.parent_nid.shape, neg_g.parent_nid.shape, cluster_nids.shape)
@@ -126,7 +141,7 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
             # forward
             logits = model(cluster)
             nids = cluster.parent_nid.numpy()
-            cluster_P = P[nids[:, None], nids]
+            cluster_P = P[nids[:, None], nids].todense()
             cluster_P = cluster_P / np.sum(cluster_P)
             cluster_P = np.maximum(cluster_P, 1e-12)
             cluster_P = torch.from_numpy(cluster_P)
@@ -145,13 +160,15 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
             loss_values.append(loss_value)
             accs = [0]
             dur.append(time.time() - t0)
+            num_pos_edges.append(pos_g.parent_eid.shape[0])
+            num_neg_edges.append(neg_g.parent_eid.shape[0])
 
             total_iter += 1
-            print("Iter {:05d} | Time(s) {:.4f} | Loss {:.4f}".
-                                        format(total_iter, dur[-1], loss_value))
+            print("Iter {:05d} | Time(s) {:.4f} | Loss {:.4f} | Positive {:05d} | Negtive {:05d}".
+                                        format(total_iter, dur[-1], loss_value, num_pos_edges[-1], num_neg_edges[-1]))
         print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {} | "
             "ETputs(KTEPS) {:.2f}".format(epoch, np.sum(dur), np.mean(loss_values),
-                                        accs[-1], n_edges / np.mean(dur) / 1000))
+                                        accs[-1], (np.sum(num_pos_edges) + np.sum(num_neg_edges)) / np.mean(dur) / 1000))
         # return
         if epoch % args.val_every == 0:
             temp_result_dir = os.path.join(result_dir, f'epoch_{epoch}')
@@ -162,7 +179,7 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
             evaluate(model, infer_model, g, features.numpy(), labels.numpy(), 
                     ks=[1, 5, 10],
                     eval_metric_path = eval_metric_path,
-                    eval_data_path = eval_data_path,
+                    eval_data_path = None,
                     eval_scatter_path = eval_scatter_path)
 
     # evaluation and save results
