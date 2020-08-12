@@ -61,13 +61,31 @@ __all__ = ['construct_sparse_knn_graph']
 
 
 def construct_sparse_knn_graph(features: np.ndarray, k: int = 30):
+    import KNNIndex as knn
     n_tree = 10
-    n_propagation = 3
     perplexity = 100
-    n_thread = 4
-    knn_result = knn.build_knn_index(features.astype(np.float), k, 
-                                     n_tree, n_propagation, perplexity, n_thread)
+    n_propagation = 3
+
+    P_knn = int(perplexity * 3)
+    knn.n_neighbors(P_knn)
+    knn.load_data(features.astype(np.float).tolist(), False)
+
+    # dir = os.getcwd()
+    knn_result = knn.construct_knn_numpy(n_tree, n_propagation, perplexity, "mnist_knn.txt", "annoy_index")
+    knn.reset()
+
     srcs = knn_result[0]
     tars = knn_result[1]
     weights = knn_result[2]
     return sp.coo_matrix((weights, (srcs, tars))).tocsr()
+
+    # n_tree = 10
+    # n_propagation = 3
+    # perplexity = 100
+    # n_thread = 4
+    # knn_result = knn.build_knn_index(features.astype(np.float), k,
+    #                                  n_tree, n_propagation, perplexity, n_thread)
+    # srcs = knn_result[0]
+    # tars = knn_result[1]
+    # weights = knn_result[2]
+    # return sp.coo_matrix((weights, (srcs, tars))).tocsr()
