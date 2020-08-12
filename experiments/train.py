@@ -7,7 +7,7 @@ from data.mnist import MNISTDataset
 
 def split_dataset(args):
     split_rates = [5, 3, 2]
-    mnist = MNISTDataset(data_dir = args.data_dir, n_samples=args.dsize, k=args.k, split_rates=split_rates)
+    mnist = MNISTDataset(data_dir=args.data_dir, n_samples=args.dsize, k=args.k, split_rates=split_rates)
     mnist.make_sparse_graph_npz()
 
 
@@ -64,6 +64,9 @@ if __name__ == '__main__':
                         help="k nearest neighbors")
 
     args = parser.parse_args()
+
+    if torch.cuda.is_available() and args.gpu == -1:
+        args.gpu = 0
 
     print(args)
     main(args)
