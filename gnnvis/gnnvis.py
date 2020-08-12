@@ -19,7 +19,6 @@ from utils.eval import evaluate, save_result
 from utils.metrics import low_dimension_evaluate
 from utils.plot import scatter
 
-
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 
@@ -32,19 +31,20 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
         json.dump(args.__dict__, fh, indent=4)
 
     g, features, labels, P = load_knn_dataset(args=args, split_part=data_split_part, data_dir=data_dir)
+    print(np.sum(np.array(P != 0, dtype=np.int), axis=0))
     in_feats = features.shape[1]
     n_classes = 2
     n_edges = g.number_of_edges()
     g.readonly()
-    
+
     print("""----Data statistics------'
     #Edges %d
     #Classes %d
     #Train samples %d
     #Val samples %d""" %
-            (n_edges, n_classes,
-            features.shape[0],
-            0))
+          (n_edges, n_classes,
+           features.shape[0],
+           0))
 
     if args.gpu < 0:
         cuda = False
@@ -54,37 +54,37 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
         torch.cuda.set_device(args.gpu)
         features = features.cuda()
         labels = labels.cuda()
-        P = P.cuda()
+        # P = P.cuda()
         print("use cuda:", args.gpu)
 
-    cluster_iterator = ClusterIter(g, args.psize, args.batch_size, 
-                                   seed_nid = None, 
-                                   use_pp = False)
+    cluster_iterator = ClusterIter(g, args.psize, args.batch_size,
+                                   seed_nid=None,
+                                   use_pp=False)
 
     # initialize model and loss function objects
     # create model
     heads = ([4] * args.n_layers) + [6]
-    model = GAT(num_layers = args.n_layers,
-                in_dim = in_feats,
-                num_hidden = args.n_hidden,
-                num_classes = n_classes,
-                heads = heads,
-                activation = F.elu,
-                feat_drop = args.dropout,
-                attn_drop = args.dropout,
-                alpha = 0.2,
-                residual = False)
+    model = GAT(num_layers=args.n_layers,
+                in_dim=in_feats,
+                num_hidden=args.n_hidden,
+                num_classes=n_classes,
+                heads=heads,
+                activation=F.elu,
+                feat_drop=args.dropout,
+                attn_drop=args.dropout,
+                alpha=0.2,
+                residual=False)
 
-    infer_model = GAT(num_layers = args.n_layers,
-                in_dim = in_feats,
-                num_hidden = args.n_hidden,
-                num_classes = n_classes,
-                heads = heads,
-                activation = F.elu,
-                feat_drop = 0.0,
-                attn_drop = 0.0,
-                alpha = 0.2,
-                residual = False)
+    infer_model = GAT(num_layers=args.n_layers,
+                      in_dim=in_feats,
+                      num_hidden=args.n_hidden,
+                      num_classes=n_classes,
+                      heads=heads,
+                      activation=F.elu,
+                      feat_drop=0.0,
+                      attn_drop=0.0,
+                      alpha=0.2,
+                      residual=False)
     if cuda:
         model.cuda()
         infer_model.cuda()
@@ -104,16 +104,16 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
             pos_edges = cluster.parent_eid
             # print(f"======================================{j}======================================")
             # print("pos_cluster: ", cluster.number_of_nodes(), cluster.number_of_edges())
-            pos_g, neg_g = next(dgl.contrib.sampling.EdgeSampler(g, 
-                                                                batch_size=pos_edges.shape[0],
-                                                                seed_edges=pos_edges,
-                                                                # edge_weight=edge_probs,
-                                                                # node_weight=node_probs,
-                                                                negative_mode='tail',
-                                                                # num_workers=1,
-                                                                reset=True,
-                                                                exclude_positive=True,
-                                                                neg_sample_size=1).__iter__())
+            pos_g, neg_g = next(dgl.contrib.sampling.EdgeSampler(g,
+                                                                 batch_size=pos_edges.shape[0],
+                                                                 seed_edges=pos_edges,
+                                                                 # edge_weight=edge_probs,
+                                                                 # node_weight=node_probs,
+                                                                 negative_mode='tail',
+                                                                 # num_workers=1,
+                                                                 reset=True,
+                                                                 exclude_positive=True,
+                                                                 neg_sample_size=1).__iter__())
             cluster_nids = torch.unique(torch.cat([pos_g.parent_nid, neg_g.parent_nid]))
             # print("Edge of pos_g, neg_g: ", pos_g.parent_eid.shape, neg_g.parent_eid.shape)
             # print("Node of pos_g, neg_g, cluster_nids: ", pos_g.parent_nid.shape, neg_g.parent_nid.shape, cluster_nids.shape)
@@ -127,7 +127,7 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
             logits = model(cluster)
             nids = cluster.parent_nid.numpy()
             cluster_P = P[nids[:, None], nids]
-            cluster_P = cluster_P / np.sum(cluster_P)
+            cluster_P = cluster_P / (np.sum(cluster_P) + 1e-12)  # cluster_P maybe a 0 matrix
             cluster_P = np.maximum(cluster_P, 1e-12)
             cluster_P = torch.from_numpy(cluster_P)
             if cuda:
@@ -148,10 +148,10 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
 
             total_iter += 1
             print("Iter {:05d} | Time(s) {:.4f} | Loss {:.4f}".
-                                        format(total_iter, dur[-1], loss_value))
+                  format(total_iter, dur[-1], loss_value))
         print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {} | "
-            "ETputs(KTEPS) {:.2f}".format(epoch, np.sum(dur), np.mean(loss_values),
-                                        accs[-1], n_edges / np.mean(dur) / 1000))
+              "ETputs(KTEPS) {:.2f}".format(epoch, np.sum(dur), np.mean(loss_values),
+                                            accs[-1], n_edges / np.mean(dur) / 1000))
         # return
         if epoch % args.val_every == 0:
             temp_result_dir = os.path.join(result_dir, f'epoch_{epoch}')
@@ -159,11 +159,11 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
             eval_metric_path = os.path.join(temp_result_dir, 'metrics.txt')
             eval_data_path = os.path.join(temp_result_dir, 'train_embedding.npz')
             eval_scatter_path = os.path.join(temp_result_dir, 'plot_result.png')
-            evaluate(model, infer_model, g, features.numpy(), labels.numpy(), 
-                    ks=[1, 5, 10],
-                    eval_metric_path = eval_metric_path,
-                    eval_data_path = eval_data_path,
-                    eval_scatter_path = eval_scatter_path)
+            evaluate(model, infer_model, g, features.numpy(), labels.numpy(),
+                     ks=[1, 5, 10],
+                     eval_metric_path=eval_metric_path,
+                     eval_data_path=eval_data_path,
+                     eval_scatter_path=eval_scatter_path)
 
     # evaluation and save results
     eval_metric_path = os.path.join(result_dir, 'metrics.txt')
@@ -171,9 +171,9 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
     eval_scatter_path = os.path.join(result_dir, 'plot_result.png')
     evaluate(model, infer_model, g, features.numpy(), labels.numpy(),
              ks=[1, 5, 10],
-             eval_metric_path = eval_metric_path,
-             eval_data_path = eval_data_path,
-             eval_scatter_path = eval_scatter_path)
+             eval_metric_path=eval_metric_path,
+             eval_data_path=eval_data_path,
+             eval_scatter_path=eval_scatter_path)
 
     # save model
     save_model_path = os.path.join(result_dir, 'model.pt')
@@ -190,16 +190,16 @@ def test(args, result_dir, data_split_part=1):
     # load model
     model_path = os.path.join(result_dir, 'model.pt')
     heads = ([4] * args.n_layers) + [6]
-    infer_model = GAT(num_layers = args.n_layers,
-                in_dim = in_feats,
-                num_hidden = args.n_hidden,
-                num_classes = n_classes,
-                heads = heads,
-                activation = F.elu,
-                feat_drop = 0.0,
-                attn_drop = 0.0,
-                alpha = 0.2,
-                residual = False)
+    infer_model = GAT(num_layers=args.n_layers,
+                      in_dim=in_feats,
+                      num_hidden=args.n_hidden,
+                      num_classes=n_classes,
+                      heads=heads,
+                      activation=F.elu,
+                      feat_drop=0.0,
+                      attn_drop=0.0,
+                      alpha=0.2,
+                      residual=False)
     infer_model.load_state_dict(torch.load(model_path))
 
     eval_metric_path = os.path.join(result_dir, 'test_metrics.txt')
@@ -218,8 +218,7 @@ def test(args, result_dir, data_split_part=1):
             fh.write(','.join([str(k) for k in ks]) + '\n')
             fh.write(','.join([str(t) for t in T]) + '\n')
             fh.write(','.join([str(l) for l in L]) + '\n')
-        if eval_scatter_path: 
+        if eval_scatter_path:
             scatter(embeddings, labels, eval_scatter_path)
         if eval_data_path:
             save_result(embeddings, filepath=eval_data_path)
-
