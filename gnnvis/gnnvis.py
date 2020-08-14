@@ -88,9 +88,9 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
     if cuda:
         model.cuda()
         infer_model.cuda()
-    # loss_fcn = TSNELoss(cuda)
+    loss_fcn = TSNELoss(cuda)
     # loss_fcn = UMAPLoss(cuda)
-    loss_fcn = LargeVisLoss(cuda)
+    # loss_fcn = LargeVisLoss(cuda)
     # use optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
