@@ -117,8 +117,8 @@ class GAT(nn.Module):
             num_hidden * heads[-2], num_classes, heads[-1],
             feat_drop, attn_drop, alpha, residual))
 
-    def forward(self, g):
-        h = g.ndata['features']
+    def forward(self, g, iscuda=False):
+        h = g.ndata['features'].cuda() if iscuda else g.ndata['features']
         for l in range(self.num_layers):
             h = self.gat_layers[l](g, h).flatten(1)
             h = self.activation(h)
