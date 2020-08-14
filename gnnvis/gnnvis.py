@@ -14,7 +14,7 @@ from sklearn import preprocessing
 from data import load_knn_dataset, MNISTDataset
 from .sampler import ClusterIter
 from .gat import GAT
-from .loss import TSNELoss
+from .loss import TSNELoss, UMAPLoss, LargeVisLoss
 from utils.eval import evaluate, save_result
 from utils.metrics import low_dimension_evaluate
 from utils.plot import scatter
@@ -31,7 +31,7 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
         json.dump(args.__dict__, fh, indent=4)
 
     g, features, labels, P = load_knn_dataset(args=args, split_part=data_split_part, data_dir=data_dir)
-    print(np.sum(np.array(P != 0, dtype=np.int), axis=0))
+    # print(np.sum(np.array(P != 0, dtype=np.int), axis=0))
     in_feats = features.shape[1]
     n_classes = 2
     n_edges = g.number_of_edges()
@@ -88,7 +88,9 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
     if cuda:
         model.cuda()
         infer_model.cuda()
-    loss_fcn = TSNELoss(cuda)
+    # loss_fcn = TSNELoss(cuda)
+    # loss_fcn = UMAPLoss(cuda)
+    loss_fcn = LargeVisLoss(cuda)
     # use optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
@@ -124,10 +126,10 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
             cluster.copy_from_parent()
             model.train()
             # forward
-            logits = model(cluster)
+            logits = model(cluster, cuda)
             nids = cluster.parent_nid.numpy()
             cluster_P = P[nids[:, None], nids]
-            cluster_P = cluster_P / (np.sum(cluster_P) + 1e-12)  # cluster_P maybe a 0 matrix
+            cluster_P = cluster_P / np.maximum(np.sum(cluster_P), 1e-12)  # cluster_P maybe a 0 matrix
             cluster_P = np.maximum(cluster_P, 1e-12)
             cluster_P = torch.from_numpy(cluster_P)
             if cuda:
@@ -159,7 +161,10 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
             eval_metric_path = os.path.join(temp_result_dir, 'metrics.txt')
             eval_data_path = os.path.join(temp_result_dir, 'train_embedding.npz')
             eval_scatter_path = os.path.join(temp_result_dir, 'plot_result.png')
-            evaluate(model, infer_model, g, features.numpy(), labels.numpy(),
+            features_numpy = features.cpu().numpy() if cuda else features.numpy()
+            labels_numpy = labels.cpu().numpy() if cuda else labels.numpy()
+            evaluate(model, infer_model, g, features_numpy, labels_numpy,
+                     iscuda=cuda,
                      ks=[1, 5, 10],
                      eval_metric_path=eval_metric_path,
                      eval_data_path=eval_data_path,
@@ -169,7 +174,10 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
     eval_metric_path = os.path.join(result_dir, 'metrics.txt')
     eval_data_path = os.path.join(result_dir, 'train_embedding.npz')
     eval_scatter_path = os.path.join(result_dir, 'plot_result.png')
-    evaluate(model, infer_model, g, features.numpy(), labels.numpy(),
+    features_numpy = features.cpu().numpy() if cuda else features.numpy()
+    labels_numpy = labels.cpu().numpy() if cuda else labels.numpy()
+    evaluate(model, infer_model, g, features_numpy, labels_numpy,
+             iscuda=cuda,
              ks=[1, 5, 10],
              eval_metric_path=eval_metric_path,
              eval_data_path=eval_data_path,
