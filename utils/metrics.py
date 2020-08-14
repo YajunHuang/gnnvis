@@ -10,10 +10,10 @@ import multiprocessing as mp
 
 def compute_metrics(features, embeddings, labels, ks=[1, 5, 10, 20, 30, 40, 50]):
     N = features.shape[0]
-    train_mask = np.zeros(N).astype(int)
-    val_mask = np.zeros(N).astype(int)
-    train_mask[:int(N * 0.7)] = 1
-    val_mask[int(N * 0.7):] = 1
+    train_mask = np.zeros(N).astype(bool)
+    val_mask = np.zeros(N).astype(bool)
+    train_mask[:int(N * 0.7)] = True
+    val_mask[int(N * 0.7):] = True
     knn_error = knn_prediction(embeddings, labels, val_mask, train_mask, ks=ks)
     if N <= 20000:
         T, L = low_dimension_evaluate(features, embeddings, ks=ks)
@@ -144,7 +144,7 @@ def knn_prediction(logits, labels, val_mask, train_mask, ks=[1, 10, 20]):
     train_labels = labels[train_mask]
     test_labels = labels[val_mask]
 
-    D2 = pairwise_distances(X=train_X, Y=test_X, metric='euclidean', n_jobs=-1) ** 2
+    D2 = pairwise_distances(X=test_X, Y=train_X, metric='euclidean', n_jobs=-1) ** 2
 
     n = test_X.shape[0]
     err = np.zeros(len(ks))
