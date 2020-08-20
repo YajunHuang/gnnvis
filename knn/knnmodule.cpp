@@ -5,23 +5,27 @@
 
 static PyObject *build_knn_index_numpy(PyObject *self, PyObject *args)
 {
-    // PyObject *v;
     PyArrayObject *v, *result;
-    // double **cresult;
     long long n_neighbor = 1;
     int n_tree = -1; 
     int n_propagation = 3;
     int n_thread = 1;
     real perplexity = -1;
 
-    if (!PyArg_ParseTuple(args, "OLnnfn", &v, &n_neighbor, &n_tree, &n_propagation, &perplexity, &n_thread))
+    if (!PyArg_ParseTuple(args, "OLiifi", &v, &n_neighbor, &n_tree, &n_propagation, &perplexity, &n_thread))
     {
         std::cout << "Input error!\n";
         return Py_None;
     }
+    std::cout << "------------- Build knn index -------------" << std::endl;
+    std::cout << "n_neighbor=" << n_neighbor << std::endl;
+    std::cout << "n_tree=" << n_tree << std::endl;
+    std::cout << "n_propagation=" << n_propagation << std::endl;
+    std::cout << "perplexity=" << perplexity << std::endl;
+    std::cout << "n_thread=" << n_thread << std::endl;
+
     int n_samples = v->dimensions[0];
     int n_dim = v->dimensions[1];
-
     double *vdata = (double *) v->data;
     real *cdata = new real[n_samples * n_dim];
 
@@ -32,7 +36,7 @@ static PyObject *build_knn_index_numpy(PyObject *self, PyObject *args)
             cdata[i*n_dim + j] = (real) vdata[i*n_dim + j];
         }
     }
-    KNN model(n_neighbor, n_propagation);
+    KNN model(n_neighbor, n_thread);
     model.load_data(cdata, n_samples, n_dim);
     model.construct_knn(n_tree, n_propagation, perplexity);
 

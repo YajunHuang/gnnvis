@@ -31,6 +31,8 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
         json.dump(args.__dict__, fh, indent=4)
 
     features, labels, P = load_knn_dataset(args=args, split_part=data_split_part, data_dir=data_dir)
+    features = torch.FloatTensor(features)
+    labels = torch.LongTensor(labels)
     g = dgl.DGLGraph()
     g.from_scipy_sparse_matrix(P)
 
@@ -240,3 +242,23 @@ def test(args, result_dir, data_split_part=1):
         if eval_data_path:
             save_result(embeddings, filepath=eval_data_path)
 
+
+def predict(args, train_split_part, predict_split_part, data_dir='./datasets'):
+    features, labels, P = load_knn_dataset(args=args, split_part=train_split_part, data_dir=data_dir)
+    train_g = dgl.DGLGraph()
+    train_g.from_scipy_sparse_matrix(P)
+    print(train_g.number_of_nodes())
+    train_g.ndata['features'] = torch.FloatTensor(features)
+    train_g.ndata['labels'] = torch.LongTensor(labels)
+
+    predict_features, predict_labels, _ = load_knn_dataset(args=args, split_part=predict_split_part, data_dir=data_dir)
+    predict_features = torch.FloatTensor(predict_features)
+    predict_labels = torch.LongTensor(predict_labels)
+
+    from .predict import build_knn_from_training_data
+    predict_g = build_knn_from_training_data(predict_features[0:2], predict_labels[0:2], 'annoy_index', args.k, train_g, n_layer=1)
+    print(predict_g.number_of_nodes())
+    print(predict_g.parent_nid)
+    print(predict_g.ndata)
+    # print(predict_g.ndata['features'])
+    

@@ -29,10 +29,6 @@ def load_knn_dataset(args, split_part=None, data_dir='./datasets/'):
             scaler = preprocessing.StandardScaler()
             scaler.fit(features)
             features = scaler.transform(features)
-
-        features = torch.FloatTensor(features)
-        labels = torch.LongTensor(spg.labels)
-        
-        return features, labels, adj_matrix
+        return features, spg.labels, adj_matrix
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
