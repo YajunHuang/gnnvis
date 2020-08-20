@@ -120,4 +120,5 @@ datasets/*
 result/*
 tests/*
 annoy_index
-
+*.npz
+deprecated/*

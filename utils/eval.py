@@ -33,7 +33,7 @@ def evaluate(model, infer_model, g, features, labels, iscuda=False, ks=None, mas
         if eval_scatter_path:
             scatter(logits, labels, eval_scatter_path)
         if eval_data_path:
-            save_result(logits, eval_data_path)
+            save_result(logits, filepath=eval_data_path)
 
 
 def save_result(embeddings, features=None, labels=None, filepath='./eval_result.npz'):

@@ -5,47 +5,47 @@ import networkx as nx
 import pandas as pd
 import scipy.sparse as sp
 
-# from annoy import AnnoyIndex
+from annoy import AnnoyIndex
 from .sparse import SparseGraph
 
 import KNN as knn
 
 
-__all__ = ['construct_sparse_knn_graph']
+__all__ = ['construct_sparse_knn_graph', 'KNNIndex']
 
 
-# class AnnoyKNN(object):
-#   annoy = None
-#   vec_len = -1
-#   metric = 'euclidean'
-#   is_loaded = False
+class KNNIndex(object):
+  annoy = None
+  vec_len = -1
+  metric = 'euclidean'
+  is_loaded = False
 
-#   def __init__(self, vec_len, metric='euclidean', index_file=None):
-#     self.vec_len = vec_len
-#     self.metric = metric
-#     self.annoy = AnnoyIndex(self.vec_len, self.metric)
-#     if index_file:
-#       self.load(index_file)
+  def __init__(self, vec_len, metric='euclidean', index_file=None):
+    self.vec_len = vec_len
+    self.metric = metric
+    self.annoy = AnnoyIndex(self.vec_len, self.metric)
+    if index_file:
+      self.load(index_file)
 
-#   def get_nns_by_item(self, i, n, search_k=-1, include_distances=False):
-#     if self.is_loaded:
-#       return self.annoy.get_nns_by_item(i, n, search_k, include_distances)
-#     else:
-#       raise RuntimeError("Annoy index file is not loaded!")
+  def get_nns_by_item(self, i, n, search_k=-1, include_distances=False):
+    if self.is_loaded:
+      return self.annoy.get_nns_by_item(i, n, search_k, include_distances)
+    else:
+      raise RuntimeError("Annoy index file is not loaded!")
 
-#   def get_nns_by_vector(self, v, n, search_k=-1, include_distances=False):
-#     if self.is_loaded:
-#       return self.annoy.get_nns_by_vector(v, n, search_k, include_distances)
-#     else:
-#       raise RuntimeError("Annoy index file is not loaded!")
+  def get_nns_by_vector(self, v, n, search_k=-1, include_distances=False, n_propagation=0):
+    if self.is_loaded:
+      return self.annoy.get_nns_by_vector(v, n, search_k, include_distances)
+    else:
+      raise RuntimeError("Annoy index file is not loaded!")
 
-#   def load(self, index_file):
-#     self.annoy.load(index_file)
-#     self.is_loaded = True
-  
-#   def unload(self):
-#     self.annoy.unload()
-#     self.is_loaded = False
+  def load(self, index_file):
+    self.annoy.load(index_file)
+    self.is_loaded = True
+
+  def unload(self):
+    self.annoy.unload()
+    self.is_loaded = False
 
 
 # def construct_knn(feature_in_lists:list, perplexity:float=30.0, P_knn:int=10):
@@ -61,31 +61,13 @@ __all__ = ['construct_sparse_knn_graph']
 
 
 def construct_sparse_knn_graph(features: np.ndarray, k: int = 30):
-    import KNNIndex as knn
     n_tree = 10
-    perplexity = 100
     n_propagation = 3
-
-    P_knn = int(perplexity * 3)
-    knn.n_neighbors(P_knn)
-    knn.load_data(features.astype(np.float).tolist(), False)
-
-    # dir = os.getcwd()
-    knn_result = knn.construct_knn_numpy(n_tree, n_propagation, perplexity, "mnist_knn.txt", "annoy_index")
-    knn.reset()
-
+    perplexity = 100
+    n_thread = 4
+    knn_result = knn.build_knn_index(features.astype(np.float), k,
+                                     n_tree, n_propagation, perplexity, n_thread)
     srcs = knn_result[0]
     tars = knn_result[1]
     weights = knn_result[2]
     return sp.coo_matrix((weights, (srcs, tars))).tocsr()
-
-    # n_tree = 10
-    # n_propagation = 3
-    # perplexity = 100
-    # n_thread = 4
-    # knn_result = knn.build_knn_index(features.astype(np.float), k,
-    #                                  n_tree, n_propagation, perplexity, n_thread)
-    # srcs = knn_result[0]
-    # tars = knn_result[1]
-    # weights = knn_result[2]
-    # return sp.coo_matrix((weights, (srcs, tars))).tocsr()

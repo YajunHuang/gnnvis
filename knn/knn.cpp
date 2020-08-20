@@ -9,7 +9,7 @@ KNN::KNN(long long n_neigh, int n_thread) : num_neighbors(n_neigh), num_threads(
     head = NULL;
 }
 
-KNN::KNN(real *data, long long num_samples, long long num_dim, long long n_neigh, int n_thread) : 
+KNN::KNN(real *data, long long num_samples, long long num_dim, long long n_neigh, int n_thread) :
     data(data), num_samples(num_samples), num_dim(num_dim), num_neighbors(n_neigh), num_threads(n_thread)
 {
     knn_vec = NULL;
@@ -48,8 +48,8 @@ gsl_rng *KNN::gsl_r = NULL;
 
 
 /**
- * 
- */ 
+ *
+ */
 void KNN::clean_data()
 {
     if (data) {delete[] data; data = NULL;}
@@ -59,14 +59,14 @@ void KNN::clean_data()
 }
 
 /**
- * 
+ *
  */
-// void KNN::load_data(std::string file_path, long long num_samples, long long num_dim) 
+// void KNN::load_data(std::string file_path, long long num_samples, long long num_dim)
 // {
 //     clean_data();
 //     std::ifstream infile;
 //     infile.open(file_path);
-//     if (!infile) 
+//     if (!infile)
 //     {
 //         std::cerr << "\nfile not found!\n";
 //         exit(1);
@@ -76,9 +76,9 @@ void KNN::clean_data()
 //     this->num_dim = num_dim;
 //     data = new real[num_samples * num_dim];
 
-//     for (long long i = 0; i < num_samples; i++) 
+//     for (long long i = 0; i < num_samples; i++)
 //     {
-//         for (long long j = 0; j < num_dim; j++) 
+//         for (long long j = 0; j < num_dim; j++)
 //         {
 //             infile >> data[i * num_dim + j];
 //         }
@@ -109,28 +109,28 @@ void KNN::save_knn(std::string file_path)
 }
 
 /**
- * 
+ *
  */
 void KNN::normalize()
 {
   real *mean = new real[num_dim];
-  for (long long i = 0; i < num_dim; i++) 
+  for (long long i = 0; i < num_dim; i++)
   {
     mean[i] = 0;
-  } 
-  for (long long i = 0, ll = 0; i < num_samples; i++, ll += num_dim) 
+  }
+  for (long long i = 0, ll = 0; i < num_samples; i++, ll += num_dim)
   {
     for (long long j = 0; j < num_dim; j++)
     {
       mean[j] += data[ll + j];
     }
   }
-  for (long long i = 0; i < num_dim; i++) 
+  for (long long i = 0; i < num_dim; i++)
   {
     mean[i] /= num_samples;
   }
   real max_mean_diff = 0;
-  for (long long i = 0, ll = 0; i < num_samples; i++, ll += num_dim) 
+  for (long long i = 0, ll = 0; i < num_samples; i++, ll += num_dim)
   {
     for (long long j = 0; j < num_dim; j++)
     {
@@ -144,12 +144,12 @@ void KNN::normalize()
   for (long long i = 0; i < num_samples * num_dim; i++)
   {
     data[i] /= max_mean_diff;
-  } 
+  }
   delete[] mean;
 }
 
 /**
- * 
+ *
  */
 real KNN::calcDist(long long x, long long y)
 {
@@ -163,9 +163,9 @@ real KNN::calcDist(long long x, long long y)
 }
 
 /**
- * 
+ *
  */
-void KNN::annoy_knn(int num_trees, std::string index_save_path) 
+void KNN::annoy_knn(int num_trees, std::string index_save_path)
 {
   std::cout << "Run annoy_knn..." << std::endl;
   // build random tree index by annoy
@@ -212,13 +212,6 @@ void *KNN::annoy_thread_caller(void *args)
  */
 void KNN::annoy_thread(int id, int num_trees, std::string index_save_path)
 {
-  // std::cout << "Run annoy_thread " << id 
-  //   << ": num_neighbors=" << num_neighbors 
-  //   << ", num_trees=" << num_trees 
-  //   << ", num_threads=" << num_threads 
-  //   << ", index_save_path=" << index_save_path 
-  //   << std::endl;
-
   long long low_pos = id * num_samples / num_threads;
   long long high_pos = (id + 1) * num_samples / num_threads;
   AnnoyIndex<int, real, Euclidean, Kiss64Random> *cur_annoy_index = NULL;
@@ -231,26 +224,26 @@ void KNN::annoy_thread(int id, int num_trees, std::string index_save_path)
   {
     cur_annoy_index = annoy_index;
   }
-  for (long long i = low_pos; i < high_pos; i++) 
+  for (long long i = low_pos; i < high_pos; i++)
   {
     cur_annoy_index->get_nns_by_item(i, num_neighbors + 1, (num_neighbors + 1) * num_trees, &knn_vec[i], NULL);
     for (long long j = 0; j < knn_vec[i].size(); j++)
     {
-      if (knn_vec[i][j] == i) 
+      if (knn_vec[i][j] == i)
       {
         knn_vec[i].erase(knn_vec[i].begin() + j);
         break;
       }
     }
   }
-  if (id > 0) 
+  if (id > 0)
   {
     delete cur_annoy_index;
   }
 }
 
 /**
- * 
+ *
  */
 void KNN::nnd_knn(int num_iter)
 {
@@ -269,7 +262,7 @@ void KNN::nnd_knn(int num_iter)
 }
 
 /**
- * 
+ *
  */
 void *KNN::nnd_thread_caller(void *args)
 {
@@ -280,7 +273,7 @@ void *KNN::nnd_thread_caller(void *args)
 }
 
 /**
- * 
+ *
  */
 void KNN::nnd_thread(int id)
 {
@@ -288,12 +281,11 @@ void KNN::nnd_thread(int id)
     long long low_pos = id * num_samples / num_threads;
     long long high_pos = (id + 1) * num_samples / num_threads;
     long long *check = new long long[num_samples];
-    //   int *check = new int[n_vertices];
     std::priority_queue< pair<real, int> > heap;
     long long x, y, i, j, l1, l2;
-	for (x = 0; x < num_samples; ++x) 
+	for (x = 0; x < num_samples; ++x)
     {
-        check[x] = -1; 
+        check[x] = -1;
     }
     for (x = low_pos; x < high_pos; x++)
 	{
@@ -314,7 +306,7 @@ void KNN::nnd_thread(int id)
         {
             std::vector<int> &v2 = temp_knn_vec[v1[i]];
 			l2 = v2.size();
-            for (j = 0; j < l2; ++j) 
+            for (j = 0; j < l2; ++j)
             {
                 if (check[y = v2[j]] != x)
                 {
@@ -385,7 +377,7 @@ void KNN::knn_similarity(real perplexity)
 			}
 			if (x > y) {
                 sum_weight += edge_weight[p] + edge_weight[q];
-				edge_weight[p] = edge_weight[q] = (edge_weight[p] + edge_weight[q]) / 2;               
+				edge_weight[p] = edge_weight[q] = (edge_weight[p] + edge_weight[q]) / 2;
 			}
 		}
 	}
@@ -435,6 +427,7 @@ void KNN::similarity_thread(int id)
             }
             if(beta > FLT_MAX) beta = FLT_MAX;
         }
+
         for (p = head[x], sum_weight = FLT_MIN; p >= 0; p = next[p])
         {
             sum_weight += edge_weight[p] = exp(-beta * edge_weight[p]);
@@ -474,12 +467,12 @@ void KNN::search_reverse_thread(int id)
 
 
 /**
- * 
+ *
  */
-void KNN::construct_knn(int num_trees, int num_iter, real perplexity) 
+void KNN::construct_knn(int num_trees, int num_iter, real perplexity)
 {
   /* gsl set random generator and seed */
-	gsl_rng_env_setup();		
+	gsl_rng_env_setup();
 	gsl_T = gsl_rng_rand48;
 	gsl_r = gsl_rng_alloc(gsl_T);
 	gsl_rng_set(gsl_r, 314159265);
@@ -523,7 +516,7 @@ void KNN::test_accuracy()
 
 
 /**
- * 
+ *
  */
 
 int ArgPos(char *str, int argc, char **argv) {
@@ -537,84 +530,3 @@ int ArgPos(char *str, int argc, char **argv) {
 	}
 	return -1;
 }
-
-// int main(int argc, char **argv)
-// {
-// 	long long i;
-//     if (argc < 3)
-//     {
-//         printf("-input: Input file of feature vectors or networks\n");
-//         printf("-output: Output file of low-dimensional representations.\n");
-//         printf("-threads: Number of threads. Default is 8.\n");
-//         printf("-outdim: The lower dimensionality LargesVis learns for visualization (usually 2 or 3). Default is 2.\n");
-//         printf("-samples: Number of edge samples for graph layout (in millions). Default is set to data size / 100 (million).\n");
-//         printf("-prop: Number of times for neighbor propagations in the state of K-NNG construction, usually less than 3. Default is 3.\n");
-//         printf("-trees: Number of random-projection trees used for constructing K-NNG. 50 is sufficient for most cases.\n");
-//         printf("-neigh: Number of neighbors (K) in K-NNG, which is usually set as three times of perplexity. Default is 150.\n");
-//         printf("-perp: The perplexity used for deciding edge weights in K-NNG. Default is 50.\n");
-//         return 0;
-//     }
-
-//   string infile, outfile;
-//   long long out_dim = -1, n_threads = -1, n_neighbors = -1, n_trees = -1, n_propagation = -1, n_samples=-1, n_dim=-1;
-//   real perplexity = -1;
-
-// 	if ((i = ArgPos((char *)"-input", argc, argv)) > 0) infile = argv[i + 1];
-// 	if ((i = ArgPos((char *)"-output", argc, argv)) > 0) outfile = argv[i + 1];
-// 	if ((i = ArgPos((char *)"-outdim", argc, argv)) > 0) out_dim = atoi(argv[i + 1]);
-// 	if ((i = ArgPos((char *)"-samples", argc, argv)) > 0) n_samples = atoi(argv[i + 1]);
-//     if ((i = ArgPos((char *)"-dim", argc, argv)) > 0) n_dim = atoi(argv[i + 1]);
-// 	if ((i = ArgPos((char *)"-threads", argc, argv)) > 0) n_threads = atoi(argv[i + 1]);
-// 	if ((i = ArgPos((char *)"-neigh", argc, argv)) > 0) n_neighbors = atoi(argv[i + 1]);
-// 	if ((i = ArgPos((char *)"-trees", argc, argv)) > 0) n_trees = atoi(argv[i + 1]);
-// 	if ((i = ArgPos((char *)"-prop", argc, argv)) > 0) n_propagation = atoi(argv[i + 1]);
-// 	if ((i = ArgPos((char *)"-perp", argc, argv)) > 0) perplexity = atof(argv[i + 1]);
-
-//   out_dim = out_dim < 0 ? 2 : out_dim;
-// 	n_threads = n_threads < 0 ? 8 : n_threads;
-// 	n_samples = n_samples;
-//   n_dim = n_dim;
-// 	n_neighbors = n_neighbors < 0 ? 150 : n_neighbors;
-// 	n_trees = n_trees;
-// 	n_propagation = n_propagation < 0 ? 3 : n_propagation;
-// 	perplexity = perplexity < 0 ? 50.0 : perplexity;
-
-//   if (n_trees < 0)
-// 	{
-// 		if (n_samples < 100000)
-// 			n_trees = 10;
-// 		else if (n_samples < 1000000)
-// 			n_trees = 20;
-// 		else if (n_samples < 5000000)
-// 			n_trees = 50;
-// 		else n_trees = 100;
-// 	}
-
-//   std::cout << "infile=" << infile << '\n'
-//             << "outfile=" << outfile << '\n'
-//             << "out_dim=" << out_dim << '\n'
-//             << "n_threads=" << n_threads << '\n'
-//             << "n_samples=" << n_samples << '\n'
-//             << "n_dim=" << n_dim << '\n'
-//             << "n_neighbors=" << n_neighbors << '\n'
-//             << "n_trees=" << n_trees << '\n'
-//             << "n_propagation=" << n_propagation << '\n'
-//             << "perplexity=" << perplexity << '\n'
-//             << std::endl;
-
-//   KNN knn(n_neighbors, n_threads);
-//   knn.load_data(infile, n_samples, n_dim);
-//   // knn.perplexity = perplexity;
-//   knn.construct_knn(n_trees, n_propagation, perplexity);
-//   knn.save_knn(outfile); 
-	
-// }
-
-// int main() 
-// {
-//   KNN knn(5, 3);
-//   knn.load_data("../data/mnist_features_only.txt", 60000, 784);
-//   knn.constrct_knn(20, 3);
-//   knn.save_knn("../data/knn_result.txt");
-  
-// }
