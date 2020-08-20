@@ -19,7 +19,7 @@ def load_knn_dataset(args, split_part=None, data_dir='./datasets/'):
     dataset = args.dataset
     n_samples = args.dsize
     k = args.k
-    
+
     if dataset == 'mnist':
         mnist = MNISTDataset(data_dir, n_samples, k)
         spg = mnist.load_sparse_graph_from_npz(split_part=split_part)

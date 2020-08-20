@@ -21,6 +21,7 @@ project file tree
  ┃ ┣ 📜gat.py
  ┃ ┣ 📜gnnvis.py
  ┃ ┣ 📜loss.py
+ ┃ ┣ 📜predict.py
  ┃ ┗ 📜sampler.py
  ┣ 📂knn
  ┃ ┣ 📂ANNOY
@@ -31,7 +32,6 @@ project file tree
  ┃ ┣ 📜knn.cpp
  ┃ ┣ 📜knn.h
  ┃ ┣ 📜knn.py
- ┃ ┣ 📜knn_module.cpp
  ┃ ┣ 📜knnmodule.cpp
  ┃ ┣ 📜setup.py
  ┃ ┗ 📜sparse.py
@@ -42,12 +42,21 @@ project file tree
  ┗ 📜README.md
 ```
 
+install knn module
+
+```
+cd knn
+python setup.py install (or python setup.py build_ext --inplace)
+```
+
 install networkx 2.3, since metis dependent it.
+
 ```
 conda install -y networkx=2.3
 ```
 
 install coranking
+
 ```
 # set up clang compiler in macos
 export CC=clang

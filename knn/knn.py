@@ -42,7 +42,7 @@ class KNNIndex(object):
   def load(self, index_file):
     self.annoy.load(index_file)
     self.is_loaded = True
-  
+
   def unload(self):
     self.annoy.unload()
     self.is_loaded = False
@@ -65,7 +65,7 @@ def construct_sparse_knn_graph(features: np.ndarray, k: int = 30):
     n_propagation = 3
     perplexity = 100
     n_thread = 4
-    knn_result = knn.build_knn_index(features.astype(np.float), k, 
+    knn_result = knn.build_knn_index(features.astype(np.float), k,
                                      n_tree, n_propagation, perplexity, n_thread)
     srcs = knn_result[0]
     tars = knn_result[1]

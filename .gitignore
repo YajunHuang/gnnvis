@@ -122,4 +122,3 @@ tests/*
 annoy_index
 *.npz
 deprecated/*
-

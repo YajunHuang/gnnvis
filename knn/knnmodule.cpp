@@ -7,7 +7,7 @@ static PyObject *build_knn_index_numpy(PyObject *self, PyObject *args)
 {
     PyArrayObject *v, *result;
     long long n_neighbor = 1;
-    int n_tree = -1; 
+    int n_tree = -1;
     int n_propagation = 3;
     int n_thread = 1;
     real perplexity = -1;
@@ -29,9 +29,9 @@ static PyObject *build_knn_index_numpy(PyObject *self, PyObject *args)
     double *vdata = (double *) v->data;
     real *cdata = new real[n_samples * n_dim];
 
-    for (int i = 0; i < n_samples; i++) 
+    for (int i = 0; i < n_samples; i++)
     {
-        for (int j = 0; j < n_dim; j++) 
+        for (int j = 0; j < n_dim; j++)
         {
             cdata[i*n_dim + j] = (real) vdata[i*n_dim + j];
         }
@@ -50,7 +50,7 @@ static PyObject *build_knn_index_numpy(PyObject *self, PyObject *args)
     int *cedge_to = (int *) edge_to->data;
     real *cedge_weight = (real *) edge_weight->data;
 
-    for (int i = 0; i < model.edge_from.size(); i++) 
+    for (int i = 0; i < model.edge_from.size(); i++)
     {
         cedge_from[i] = (int) model.edge_from[i];
         cedge_to[i] = (int) model.edge_to[i];
@@ -66,7 +66,7 @@ static PyObject *build_knn_index_numpy(PyObject *self, PyObject *args)
 // {
 //     PyObject *v;
 //     long long n_neighbor = 1;
-//     int n_tree = -1; 
+//     int n_tree = -1;
 //     int n_propagation = 3;
 //     int n_thread = 1;
 //     real perplexity = -1;
@@ -109,7 +109,7 @@ static PyObject *build_knn_index_numpy(PyObject *self, PyObject *args)
 
 
 // Method table
-static PyMethodDef PyExtMethods[] = 
+static PyMethodDef PyExtMethods[] =
 {
     {"build_knn_index", build_knn_index_numpy, METH_VARARGS, "build_knn_index(data, n_neigh, n_trees, n_propagation, perplexity, n_thread)"},
     // {"build_knn_index", build_knn_index, METH_VARARGS, "build_knn_index_numpy(data, n_neigh, n_trees, n_propagation, perplexity, n_thread)"},

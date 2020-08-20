@@ -69,5 +69,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    if torch.cuda.is_available() and args.gpu == -1:
+        args.gpu = 0
+
     print(args)
     main(args)

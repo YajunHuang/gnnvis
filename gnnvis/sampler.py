@@ -16,7 +16,6 @@ class ClusterIter(object):
     '''
     def __init__(self, dn, g, psize, batch_size, seed_nid, use_pp=True):
         """Initialize the sampler.
-
         Paramters
         ---------
         dn : str

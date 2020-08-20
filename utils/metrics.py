@@ -5,18 +5,37 @@ import coranking
 from coranking.metrics import trustworthiness, continuity, LCMC
 from scipy.spatial import distance
 from sklearn.metrics.pairwise import pairwise_distances
+import multiprocessing as mp
 
 
 def compute_metrics(features, embeddings, labels, ks=[1, 5, 10, 20, 30, 40, 50]):
     N = features.shape[0]
-    train_mask = np.zeros(N).astype(int)
-    val_mask = np.zeros(N).astype(int)
-    train_mask[:int(N * 0.7)] = 1
-    val_mask[int(N * 0.7):] = 1
+    train_mask = np.zeros(N).astype(bool)
+    val_mask = np.zeros(N).astype(bool)
+    train_mask[:int(N * 0.7)] = True
+    val_mask[int(N * 0.7):] = True
     knn_error = knn_prediction(embeddings, labels, val_mask, train_mask, ks=ks)
-    T, L = low_dimension_evaluate(features, embeddings, ks=ks)
+    if N <= 20000:
+        T, L = low_dimension_evaluate(features, embeddings, ks=ks)
+    else:
+        T, L = low_dimension_evaluate_large(features, embeddings, ks=ks, block=10000)
     return knn_error, T, L
 
+def compute_test_metrics(train_features, train_embeddings, train_labels, test_features, test_embeddings, test_labels, ks=[1, 5, 10, 20, 30, 40, 50]):
+    TN = train_features.shape[0]
+    N = test_features.shape[0]
+    train_mask = np.zeros(TN + N).astype(bool)
+    val_mask = np.zeros(TN + N).astype(bool)
+    train_mask[:TN] = True
+    val_mask[TN:] = True
+    embeddings = np.concatenate((train_embeddings, test_embeddings), axis=0)
+    labels = np.concatenate((train_labels, test_labels))
+    knn_error = knn_prediction(embeddings, labels, val_mask, train_mask, ks=ks)
+    if N <= 20000:
+        T, L = low_dimension_evaluate(test_features, test_embeddings, ks=ks)
+    else:
+        T, L = low_dimension_evaluate_large(test_features, test_embeddings, ks=ks, block=10000)
+    return knn_error, T, L
 
 def qmatrix(high_data, low_data):
     """Generate a co-ranking matrix from two data frames of high and low
@@ -45,6 +64,14 @@ def low_dimension_evaluate(high_dim_data: np.array, low_dim_data: np.array, ks: 
     T = T[np.array(ks) - 1]
     L = LCMC(Q, min_k=1, max_k=101)
     L = L[np.array(ks) - 1]
+    return T, L
+
+def low_dimension_evaluate_large(high_dim_data: np.array, low_dim_data: np.array, ks: list=[1, 5, 10, 20, 30, 40, 50, 90, 100], block:int=10, n_jobs:int=-1):
+    i = 0
+    T = trustworthiness_large(high_dim_data, low_dim_data, ks, block=block, n_jobs=n_jobs)
+    L = LCMC_large(high_dim_data, low_dim_data, ks, block=block, n_jobs=n_jobs)
+    # print("\t".join(["{:.4f}".format(Ti) for Ti in T]))
+    # print("\t".join(["{:.4f}".format(Li) for Li in L]))
     return T, L
 
 
@@ -117,7 +144,7 @@ def knn_prediction(logits, labels, val_mask, train_mask, ks=[1, 10, 20]):
     train_labels = labels[train_mask]
     test_labels = labels[val_mask]
 
-    D2 = pairwise_distances(X=train_X, Y=test_X, metric='euclidean', n_jobs=-1) ** 2
+    D2 = pairwise_distances(X=test_X, Y=train_X, metric='euclidean', n_jobs=-1) ** 2
 
     n = test_X.shape[0]
     err = np.zeros(len(ks))
@@ -136,3 +163,84 @@ def knn_prediction(logits, labels, val_mask, train_mask, ks=[1, 10, 20]):
         err[j] = float(err[j]) / float(n)
     # print("\t".join(["{:.4f}".format(1 - erri) for erri in err]))
     return err
+
+
+def LCMC_large(X:np.array, mappedX:np.array, Ks:list=[1], block:int=10, n_jobs:int=-1):
+    if n_jobs == -1:
+        n_jobs = mp.cpu_count()
+    n, d = X.shape
+    i_s = [block] * int(n / block) if n % block == 0 else [block] * int(n / block) + [n % block]
+    starti = 0
+    L = np.zeros(len(Ks))
+    for i in i_s:
+        endi = starti + i
+        hD = pairwise_distances(X=X[starti:endi, :], Y=X, metric='euclidean', n_jobs=n_jobs) ** 2
+        lD = pairwise_distances(X=mappedX[starti:endi, :], Y=mappedX, metric='euclidean', n_jobs=n_jobs) ** 2
+        starti += i
+        ind1 = hD.argsort(axis=1)
+        ind2 = lD.argsort(axis=1)
+        for j in range(i):
+            for k in range(len(Ks)):
+                L[k] += len(np.intersect1d(ind1[j, 1:Ks[k] + 1], ind2[j, 1:Ks[k] + 1]))
+    for k in range(len(Ks)):
+        L[k] = L[k] / (n * Ks[k]) + Ks[k] / (1 - n)
+    return L
+
+
+def trustworthiness_large(X:np.array, mappedX:np.array, Ks:list=[1], block:int=10000, n_jobs:int=-1):
+    def worker(outi, ind1, ind2, Ks, return_dict):
+        ranks = np.zeros(np.max(Ks))
+        T = np.zeros(len(Ks))
+        n, d = ind1.shape
+        for j in range(n):
+            for m in range(np.max(Ks)):
+                ranks[m] = np.where(ind1[j, :] == ind2[j][m + 1])[0]
+            ii = 0
+            for k in Ks:
+                ranksi = ranks[:k] - k
+                T[ii] += np.sum(ranksi[ranksi > 0])
+                ii += 1
+        return_dict[outi] = T
+
+    if n_jobs == -1:
+        n_jobs = mp.cpu_count()
+
+    if block < n_jobs:
+        block = n_jobs * 5
+    n, d = X.shape
+    i_s = [block] * int(n / block) if n % block == 0 else [block] * int(n / block) + [n % block]
+    starti = 0
+    T = np.zeros(len(Ks))
+    for i in i_s:
+        endi = starti + i
+        hD = pairwise_distances(X=X[starti:endi, :], Y=X, metric='euclidean', n_jobs=n_jobs) ** 2
+        lD = pairwise_distances(X=mappedX[starti:endi, :], Y=mappedX, metric='euclidean', n_jobs=n_jobs) ** 2
+        starti += i
+        ind1 = hD.argsort(axis=1)
+        ind2 = lD.argsort(axis=1)
+
+        splits = n_jobs
+        # ranks = multicore_func(ind1, ind2, n_jobs=n_jobs, Ks=Ks)
+        chunk = block // splits
+        chunk0 = [ind1[i * chunk:(i + 1) * chunk] for i in range(splits)]
+        chunk1 = [ind2[i * chunk:(i + 1) * chunk] for i in range(splits)]
+
+        record = []
+        manager = mp.Manager()
+        return_dict = manager.dict()
+
+        for i in range(n_jobs):
+            process = mp.Process(target=worker, args=(i, chunk0[i], chunk1[i], Ks, return_dict))
+            process.start()
+            record.append(process)
+        for process in record:
+            process.join()
+
+        for PT in return_dict.values():
+            T += PT
+
+    ii = 0
+    for k in Ks:
+        T[ii] = 1 - ((2 / (n * k * (2 * n - 3 * k - 1))) * T[ii])
+        ii += 1
+    return T

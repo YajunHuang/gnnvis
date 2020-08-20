@@ -9,7 +9,7 @@ KNN::KNN(long long n_neigh, int n_thread) : num_neighbors(n_neigh), num_threads(
     head = NULL;
 }
 
-KNN::KNN(real *data, long long num_samples, long long num_dim, long long n_neigh, int n_thread) : 
+KNN::KNN(real *data, long long num_samples, long long num_dim, long long n_neigh, int n_thread) :
     data(data), num_samples(num_samples), num_dim(num_dim), num_neighbors(n_neigh), num_threads(n_thread)
 {
     knn_vec = NULL;
@@ -48,8 +48,8 @@ gsl_rng *KNN::gsl_r = NULL;
 
 
 /**
- * 
- */ 
+ *
+ */
 void KNN::clean_data()
 {
     if (data) {delete[] data; data = NULL;}
@@ -59,14 +59,14 @@ void KNN::clean_data()
 }
 
 /**
- * 
+ *
  */
-// void KNN::load_data(std::string file_path, long long num_samples, long long num_dim) 
+// void KNN::load_data(std::string file_path, long long num_samples, long long num_dim)
 // {
 //     clean_data();
 //     std::ifstream infile;
 //     infile.open(file_path);
-//     if (!infile) 
+//     if (!infile)
 //     {
 //         std::cerr << "\nfile not found!\n";
 //         exit(1);
@@ -76,9 +76,9 @@ void KNN::clean_data()
 //     this->num_dim = num_dim;
 //     data = new real[num_samples * num_dim];
 
-//     for (long long i = 0; i < num_samples; i++) 
+//     for (long long i = 0; i < num_samples; i++)
 //     {
-//         for (long long j = 0; j < num_dim; j++) 
+//         for (long long j = 0; j < num_dim; j++)
 //         {
 //             infile >> data[i * num_dim + j];
 //         }
@@ -109,28 +109,28 @@ void KNN::save_knn(std::string file_path)
 }
 
 /**
- * 
+ *
  */
 void KNN::normalize()
 {
   real *mean = new real[num_dim];
-  for (long long i = 0; i < num_dim; i++) 
+  for (long long i = 0; i < num_dim; i++)
   {
     mean[i] = 0;
-  } 
-  for (long long i = 0, ll = 0; i < num_samples; i++, ll += num_dim) 
+  }
+  for (long long i = 0, ll = 0; i < num_samples; i++, ll += num_dim)
   {
     for (long long j = 0; j < num_dim; j++)
     {
       mean[j] += data[ll + j];
     }
   }
-  for (long long i = 0; i < num_dim; i++) 
+  for (long long i = 0; i < num_dim; i++)
   {
     mean[i] /= num_samples;
   }
   real max_mean_diff = 0;
-  for (long long i = 0, ll = 0; i < num_samples; i++, ll += num_dim) 
+  for (long long i = 0, ll = 0; i < num_samples; i++, ll += num_dim)
   {
     for (long long j = 0; j < num_dim; j++)
     {
@@ -144,12 +144,12 @@ void KNN::normalize()
   for (long long i = 0; i < num_samples * num_dim; i++)
   {
     data[i] /= max_mean_diff;
-  } 
+  }
   delete[] mean;
 }
 
 /**
- * 
+ *
  */
 real KNN::calcDist(long long x, long long y)
 {
@@ -163,9 +163,9 @@ real KNN::calcDist(long long x, long long y)
 }
 
 /**
- * 
+ *
  */
-void KNN::annoy_knn(int num_trees, std::string index_save_path) 
+void KNN::annoy_knn(int num_trees, std::string index_save_path)
 {
   std::cout << "Run annoy_knn..." << std::endl;
   // build random tree index by annoy
@@ -224,26 +224,26 @@ void KNN::annoy_thread(int id, int num_trees, std::string index_save_path)
   {
     cur_annoy_index = annoy_index;
   }
-  for (long long i = low_pos; i < high_pos; i++) 
+  for (long long i = low_pos; i < high_pos; i++)
   {
     cur_annoy_index->get_nns_by_item(i, num_neighbors + 1, (num_neighbors + 1) * num_trees, &knn_vec[i], NULL);
     for (long long j = 0; j < knn_vec[i].size(); j++)
     {
-      if (knn_vec[i][j] == i) 
+      if (knn_vec[i][j] == i)
       {
         knn_vec[i].erase(knn_vec[i].begin() + j);
         break;
       }
     }
   }
-  if (id > 0) 
+  if (id > 0)
   {
     delete cur_annoy_index;
   }
 }
 
 /**
- * 
+ *
  */
 void KNN::nnd_knn(int num_iter)
 {
@@ -262,7 +262,7 @@ void KNN::nnd_knn(int num_iter)
 }
 
 /**
- * 
+ *
  */
 void *KNN::nnd_thread_caller(void *args)
 {
@@ -273,7 +273,7 @@ void *KNN::nnd_thread_caller(void *args)
 }
 
 /**
- * 
+ *
  */
 void KNN::nnd_thread(int id)
 {
@@ -283,9 +283,9 @@ void KNN::nnd_thread(int id)
     long long *check = new long long[num_samples];
     std::priority_queue< pair<real, int> > heap;
     long long x, y, i, j, l1, l2;
-	for (x = 0; x < num_samples; ++x) 
+	for (x = 0; x < num_samples; ++x)
     {
-        check[x] = -1; 
+        check[x] = -1;
     }
     for (x = low_pos; x < high_pos; x++)
 	{
@@ -306,7 +306,7 @@ void KNN::nnd_thread(int id)
         {
             std::vector<int> &v2 = temp_knn_vec[v1[i]];
 			l2 = v2.size();
-            for (j = 0; j < l2; ++j) 
+            for (j = 0; j < l2; ++j)
             {
                 if (check[y = v2[j]] != x)
                 {
@@ -377,7 +377,7 @@ void KNN::knn_similarity(real perplexity)
 			}
 			if (x > y) {
                 sum_weight += edge_weight[p] + edge_weight[q];
-				edge_weight[p] = edge_weight[q] = (edge_weight[p] + edge_weight[q]) / 2;               
+				edge_weight[p] = edge_weight[q] = (edge_weight[p] + edge_weight[q]) / 2;
 			}
 		}
 	}
@@ -427,7 +427,7 @@ void KNN::similarity_thread(int id)
             }
             if(beta > FLT_MAX) beta = FLT_MAX;
         }
-        
+
         for (p = head[x], sum_weight = FLT_MIN; p >= 0; p = next[p])
         {
             sum_weight += edge_weight[p] = exp(-beta * edge_weight[p]);
@@ -467,12 +467,12 @@ void KNN::search_reverse_thread(int id)
 
 
 /**
- * 
+ *
  */
-void KNN::construct_knn(int num_trees, int num_iter, real perplexity) 
+void KNN::construct_knn(int num_trees, int num_iter, real perplexity)
 {
   /* gsl set random generator and seed */
-	gsl_rng_env_setup();		
+	gsl_rng_env_setup();
 	gsl_T = gsl_rng_rand48;
 	gsl_r = gsl_rng_alloc(gsl_T);
 	gsl_rng_set(gsl_r, 314159265);
@@ -516,7 +516,7 @@ void KNN::test_accuracy()
 
 
 /**
- * 
+ *
  */
 
 int ArgPos(char *str, int argc, char **argv) {
