@@ -1,12 +1,18 @@
 from distutils.core import setup, Extension
 import os
+import platform
+
 import numpy as np
 
-os.environ["CC"] = "clang"
-os.environ["CXX"] = "clang++"
 
-# os.environ["CC"] = "gcc"
-# os.environ["CXX"] = "g++"
+system = platform.system()
+
+if system == 'Linux':
+    os.environ["CC"] = "gcc"
+    os.environ["CXX"] = "g++"
+elif system == 'Darwin':
+    os.environ["CC"] = "clang"
+    os.environ["CXX"] = "clang++"
 
 KNN = Extension('KNN',
                 sources = ['knn.cpp', 'knnmodule.cpp'],

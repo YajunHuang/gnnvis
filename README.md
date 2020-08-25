@@ -27,7 +27,6 @@ project file tree
  ┃ ┣ 📂ANNOY
  ┃ ┃ ┣ 📜annoylib.h
  ┃ ┃ ┗ 📜kissrandom.h
- ┃ ┣ 📜Makefile
  ┃ ┣ 📜__init__.py
  ┃ ┣ 📜knn.cpp
  ┃ ┣ 📜knn.h
@@ -47,12 +46,6 @@ install knn module
 ```
 cd knn
 python setup.py install (or python setup.py build_ext --inplace)
-```
-
-install networkx 2.3, since metis dependent it.
-
-```
-conda install -y networkx=2.3
 ```
 
 install coranking

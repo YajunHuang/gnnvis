@@ -14,7 +14,7 @@ def split_dataset(args, split_rates=None):
 
 def main(args):
     split_dataset(args)
-    # train(args)
+    train(args)
     # test(args, result_dir='/Users/yale/Projects/research/gnnvis/result/mnist/2020-04-22-153247')
     # predict(args, train_split_part=0, predict_split_part=1)
 
