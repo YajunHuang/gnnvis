@@ -28,11 +28,11 @@ class MNISTDataset(BaseDataset):
         images_url = 'http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz'
         labels_url = 'http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz'
         compress_images_file_path = os.path.join(self.download_dir, "train-images-idx3-ubyte.gz")
-        compress_labels_file_path = os.path.join(self.download_dir, "train-labels-idx3-ubyte.gz")
+        compress_labels_file_path = os.path.join(self.download_dir, "train-labels-idx1-ubyte.gz")
         download(images_url, compress_images_file_path)
         download(labels_url, compress_labels_file_path)
         images_file_path = os.path.join(self.extract_dir, "train-images-idx3-ubyte")
-        labels_file_path = os.path.join(self.extract_dir, "train-labels-idx3-ubyte")
+        labels_file_path = os.path.join(self.extract_dir, "train-labels-idx1-ubyte")
         extract_archive(compress_images_file_path, images_file_path)
         extract_archive(compress_labels_file_path, labels_file_path)
         with open(images_file_path, 'rb') as fh:
