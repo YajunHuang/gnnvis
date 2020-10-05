@@ -3,13 +3,20 @@ import argparse
 from gnnvis.gnnvis import *
 from data import register_data_args
 from data.mnist import MNISTDataset
+from data.fmnist import FMNISTDataset
 
 
 def split_dataset(args, split_rates=None):
     if split_rates is None:
         split_rates = [8, 1, 1]
-    mnist = MNISTDataset(data_dir = args.data_dir, n_samples=args.dsize, k=args.k, split_rates=split_rates)
-    mnist.make_sparse_graph_npz()
+    if args.dataset == 'mnist':
+        mnist = MNISTDataset(data_dir=args.data_dir, n_samples=args.dsize, k=args.k, split_rates=split_rates)
+        mnist.make_sparse_graph_npz()
+    elif args.dataset == 'fmnist':
+        fmnist = FMNISTDataset(data_dir=args.data_dir, n_samples=args.dsize, k=args.k, split_rates=split_rates)
+        fmnist.make_sparse_graph_npz()
+    else:
+        raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
 
 def main(args):

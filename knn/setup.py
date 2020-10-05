@@ -17,8 +17,8 @@ elif system == 'Darwin':
 KNN = Extension('KNN',
                 sources = ['knn.cpp', 'knnmodule.cpp'],
                 depends = ['knn.h'],
-                include_dirs = ['/usr/local/include', np.get_include()],
-                library_dirs = ['/usr/local/lib'],
+                include_dirs = ['/usr/local/include', np.get_include(), '/home/jingbin/software/gsl/include'],
+                library_dirs = ['/usr/local/lib', '/home/jingbin/software/gsl/lib'],
                 libraries = ['gsl', 'gslcblas'],
                 extra_compile_args = ['-std=c++1y', '-lm', '-pthread', '-lgsl', '-lgslcblas', '-Ofast', '-march=native', '-ffast-math']
 )
