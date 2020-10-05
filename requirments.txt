@@ -1,8 +1,10 @@
 dgl==0.4.3
 requests
-pytorch
+torch==1.6.0
+torchvision==0.7.0
 matplotlib==3.0.3
 numpy==1.16.1
 pandas==1.0.1
 scikit-learn
+sklearn
 annoy
