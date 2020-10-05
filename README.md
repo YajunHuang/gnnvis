@@ -13,6 +13,7 @@ project file tree
  ┃ ┣ 📜__init__.py
  ┃ ┣ 📜base.py
  ┃ ┣ 📜mnist.py
+ ┃ ┣ 📜fmnist.py
  ┃ ┗ 📜utils.py
  ┣ 📂experiments
  ┃ ┗ 📜train.py
@@ -56,5 +57,11 @@ export CC=clang
 export CXX=clang++
 
 pip install git+https://github.com/samueljackson92/coranking.git
+```
+
+Running in GPU
+
+```
+pip install dgl-cuXXX==0.4.3
 ```
 
