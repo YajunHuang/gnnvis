@@ -12,9 +12,9 @@ import torch.nn.functional as F
 
 from data import load_knn_dataset
 from .sampler import ClusterIter
-from .gat import GAT
+from dgl.nn.pytorch.conv import SGConv
 from .loss import TSNELoss, UMAPLoss, LargeVisLoss
-from utils.eval import evaluate, save_result
+from utils.eval import evaluate_sgc, save_result
 from utils.metrics import low_dimension_evaluate
 from utils.plot import scatter
 
@@ -80,28 +80,17 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
 
     # initialize model and loss function objects
     # create model
-    heads = ([4] * args.n_layers) + [6]
-    model = GAT(num_layers = args.n_layers,
-                in_dim = in_feats,
-                num_hidden = args.n_hidden,
-                num_classes = n_classes,
-                heads = heads,
-                activation = F.elu,
-                feat_drop = args.dropout,
-                attn_drop = args.dropout,
-                alpha = 0.2,
-                residual = False)
-
-    infer_model = GAT(num_layers = args.n_layers,
-                in_dim = in_feats,
-                num_hidden = args.n_hidden,
-                num_classes = n_classes,
-                heads = heads,
-                activation = F.elu,
-                feat_drop = 0.0,
-                attn_drop = 0.0,
-                alpha = 0.2,
-                residual = False)
+    model = SGConv(in_feats,
+                   n_classes,
+                   k=2,
+                   cached=False,
+                   bias=True)
+                   
+    infer_model = SGConv(in_feats,
+                   n_classes,
+                   k=2,
+                   cached=False,
+                   bias=True)
     if cuda:
         model.cuda()
         infer_model.cuda()
@@ -114,6 +103,11 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
     # the train process for multiple epochs
     for epoch in range(1, args.n_epochs + 1):
         dur = []
+        sns_dur = []
+        sgc_dur = []
+        loss1_dur = []
+        loss2_dur = []
+        loss3_dur = []
         loss_values = []
         num_pos_edges = []
         num_neg_edges = []
@@ -143,9 +137,13 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
 
             # sync with upper level training graph
             cluster.copy_from_parent()
+            sns_dur.append(time.time() - t0)
             model.train()
             # forward
-            logits = model(cluster, cuda)
+            sgc_time = time.time()
+            logits = model(cluster, cluster.ndata['features'].cuda() if cuda else cluster.ndata['features'])
+            sgc_dur.append(time.time() - sgc_time)
+            loss_time = time.time()
             nids = cluster.parent_nid.numpy()
             cluster_P = P[nids[:, None], nids].todense()
             cluster_P = cluster_P / np.maximum(np.sum(cluster_P), 1e-12)  # cluster_P maybe a 0 matrix
@@ -153,11 +151,15 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
             cluster_P = torch.from_numpy(cluster_P)
             if cuda:
                 cluster_P = cluster_P.cuda()
-
+            
+            loss2_dur.append(time.time() - loss_time)
+            
             if epoch <= 100:
                 loss = loss_fcn(logits, cluster_P * 4)
             else:
                 loss = loss_fcn(logits, cluster_P)
+            
+            loss1_dur.append(time.time() - loss_time)
 
             optimizer.zero_grad()
             loss.backward()
@@ -172,8 +174,8 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
             total_iter += 1
             print("Iter {:05d} | Time(s) {:.4f} | Loss {:.4f} | Positive {:05d} | Negtive {:05d}".
                                         format(total_iter, dur[-1], loss_value, num_pos_edges[-1], num_neg_edges[-1]))
-        print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {} | "
-            "ETputs(KTEPS) {:.2f}".format(epoch, np.sum(dur), np.mean(loss_values),
+        print("Epoch {:05d} | Time(s) {:.4f} {:.4f} {:.4f} {:.4f} {:.4f} | Loss {:.4f} | Accuracy {} | "
+            "ETputs(KTEPS) {:.2f}".format(epoch, np.sum(dur), np.sum(sns_dur), np.sum(sgc_dur), np.sum(loss2_dur), np.sum(loss1_dur) - np.sum(loss2_dur), np.mean(loss_values),
                                         accs[-1], (np.sum(num_pos_edges) + np.sum(num_neg_edges)) / np.mean(dur) / 1000))
         # return
         if epoch % args.val_every == 0:
@@ -184,12 +186,12 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
             eval_scatter_path = os.path.join(temp_result_dir, 'plot_result.png')
             features_numpy = features.cpu().numpy() if cuda else features.numpy()
             labels_numpy = labels.cpu().numpy() if cuda else labels.numpy()
-            evaluate(model, infer_model, g, features_numpy, labels_numpy,
-                     iscuda=cuda,
-                     ks=[1, 5, 10, 20, 30, 40, 50, 90, 100],
-                     eval_metric_path=eval_metric_path,
-                     eval_data_path=None,
-                     eval_scatter_path=eval_scatter_path)
+            evaluate_sgc(model, infer_model, g, features_numpy, labels_numpy,
+                         iscuda=cuda,
+                         ks=[1, 5, 10, 20, 30, 40, 50, 90, 100],
+                         eval_metric_path=eval_metric_path,
+                         eval_data_path=None,
+                         eval_scatter_path=eval_scatter_path)
 
     # evaluation and save results
     eval_metric_path = os.path.join(result_dir, 'metrics.txt')
@@ -197,12 +199,12 @@ def train(args, data_split_part=0, data_dir='./datasets', result_dir='./result')
     eval_scatter_path = os.path.join(result_dir, 'plot_result.png')
     features_numpy = features.cpu().numpy() if cuda else features.numpy()
     labels_numpy = labels.cpu().numpy() if cuda else labels.numpy()
-    evaluate(model, infer_model, g, features_numpy, labels_numpy,
-             iscuda=cuda,
-             ks=[1, 5, 10, 20, 30, 40, 50, 90, 100],
-             eval_metric_path = eval_metric_path,
-             eval_data_path = eval_data_path,
-             eval_scatter_path = eval_scatter_path)
+    evaluate_sgc(model, infer_model, g, features_numpy, labels_numpy,
+                 iscuda=cuda,
+                 ks=[1, 5, 10, 20, 30, 40, 50, 90, 100],
+                 eval_metric_path = eval_metric_path,
+                 eval_data_path = eval_data_path,
+                 eval_scatter_path = eval_scatter_path)
 
     # save model
     save_model_path = os.path.join(result_dir, 'model.pt')

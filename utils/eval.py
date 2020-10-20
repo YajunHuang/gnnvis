@@ -36,6 +36,32 @@ def evaluate(model, infer_model, g, features, labels, iscuda=False, ks=None, mas
             save_result(logits, filepath=eval_data_path)
 
 
+def evaluate_sgc(model, infer_model, g, features, labels, iscuda=False, ks=None, mask=None,
+             eval_metric_path=None, eval_data_path=None, eval_scatter_path=None):
+    for infer_param, param in zip(infer_model.parameters(), model.parameters()):
+        infer_param.data.copy_(param.data)
+    infer_model.eval()
+    with torch.no_grad():
+        logits = infer_model(g, g.ndata['features'].cuda() if iscuda else g.ndata['features'])
+        if mask is not None:
+            logits = logits[mask]
+            labels = labels[mask]
+            features = features[mask]
+        logits = logits.cpu().numpy() if iscuda else logits.numpy()
+        if ks:
+            E, T, L = compute_metrics(features, logits, labels, ks)
+            if eval_metric_path:
+                with open(eval_metric_path, 'w') as fh:
+                    fh.write(','.join([str(k) for k in ks]) + '\n')
+                    fh.write(','.join([str(e) for e in E]) + '\n')
+                    fh.write(','.join([str(t) for t in T]) + '\n')
+                    fh.write(','.join([str(l) for l in L]) + '\n')
+        if eval_scatter_path:
+            scatter(logits, labels, eval_scatter_path)
+        if eval_data_path:
+            save_result(logits, filepath=eval_data_path)
+
+
 def save_result(embeddings, features=None, labels=None, filepath='./eval_result.npz'):
     data_dict = {}
     data_dict['embedding'] = embeddings

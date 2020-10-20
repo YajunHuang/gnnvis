@@ -1,9 +1,12 @@
 import argparse
+import torch
 
-from gnnvis.gnnvis import *
+import gnnvis.gnnvis as gat
+import gnnvis.sgcvis as sgc
 from data import register_data_args
 from data.mnist import MNISTDataset
 from data.fmnist import FMNISTDataset
+from data.prime import PRIMEDataset
 
 
 def split_dataset(args, split_rates=None):
@@ -15,13 +18,17 @@ def split_dataset(args, split_rates=None):
     elif args.dataset == 'fmnist':
         fmnist = FMNISTDataset(data_dir=args.data_dir, n_samples=args.dsize, k=args.k, split_rates=split_rates)
         fmnist.make_sparse_graph_npz()
+    elif args.dataset == 'prime':
+        prime = PRIMEDataset(data_dir=args.data_dir, n_samples=args.dsize, k=args.k, split_rates=split_rates)
+        prime.make_sparse_graph_npz()
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
 
 def main(args):
     split_dataset(args)
-    train(args)
+    # gat.train(args)
+    sgc.train(args)
     # test(args, result_dir='/Users/yale/Projects/research/gnnvis/result/mnist/2020-04-22-153247')
     # predict(args, train_split_part=0, predict_split_part=1)
 
