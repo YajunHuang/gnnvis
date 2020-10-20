@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import torch
 
@@ -14,11 +15,14 @@ def compute_metrics(features, embeddings, labels, ks=[1, 5, 10, 20, 30, 40, 50])
     val_mask = np.zeros(N).astype(bool)
     train_mask[:int(N * 0.7)] = True
     val_mask[int(N * 0.7):] = True
-    knn_error = knn_prediction(embeddings, labels, val_mask, train_mask, ks=ks)
-    if N <= 20000:
+    # knn_error = knn_prediction(embeddings, labels, val_mask, train_mask, ks=ks)
+    knn_error = knn_prediction_fast(embeddings, labels, val_mask, train_mask, Ks=ks, block=-5)
+    if N <= 10000:
         T, L = low_dimension_evaluate(features, embeddings, ks=ks)
-    else:
+    elif N <= 15000:
         T, L = low_dimension_evaluate_large(features, embeddings, ks=ks, block=10000)
+    else:
+        T, L = np.zeros(len(ks)), np.zeros(len(ks))
     return knn_error, T, L
 
 def compute_test_metrics(train_features, train_embeddings, train_labels, test_features, test_embeddings, test_labels, ks=[1, 5, 10, 20, 30, 40, 50]):
@@ -165,6 +169,82 @@ def knn_prediction(logits, labels, val_mask, train_mask, ks=[1, 10, 20]):
     return err
 
 
+def knn_prediction_fast(logits, labels, val_mask, train_mask, Ks: list = [1, 10, 20], block: int = 10000, n_jobs: int = -1):
+    train_X = logits[train_mask]
+    test_X = logits[val_mask]
+    train_labels = labels[train_mask]
+    test_labels = labels[val_mask]
+
+    if n_jobs == -1:
+        n_jobs = int(mp.cpu_count() * 0.9)
+    if block < 0:
+        block = n_jobs * 100 * (-block)
+
+    n = test_X.shape[0]
+    err = np.zeros(len(Ks))
+    n_blocks = n // block + 1
+    # print(n)
+    for b in range(n_blocks):
+        print("Run in block [{}/{}]".format(b, n_blocks), end="")
+        start_time = time.time()
+        low_X = int(b * n / n_blocks)
+        high_X = int((b + 1) * n / n_blocks)
+        if high_X > n:
+            high_X = n
+        # print("low_X: {}, high_X: {}".format(low_X, high_X))
+        num_samples = test_X[low_X: high_X, :].shape[0]
+
+        D2 = pairwise_distances(X=test_X[low_X: high_X, :], Y=train_X, metric='euclidean', n_jobs=n_jobs) ** 2
+
+        test_labels_block = test_labels[low_X: high_X]
+        def worker(id, return_dict):
+            low_pos = int(id * num_samples / n_jobs)
+            high_pos = int((id + 1) * num_samples / n_jobs)
+            if high_pos > num_samples:
+                high_pos = num_samples
+            # print("low_pos: {}, high_pos: {}".format(low_pos, high_pos))
+            inner_err = np.zeros(len(Ks))
+            for ii in range(low_pos, high_pos):
+                tmp_D = np.argsort(D2[ii, :])
+                for j in range(len(Ks)):
+                    tmp = tmp_D[:Ks[j]]
+                    tmp_l = train_labels[tmp]
+                    tu = sorted([(np.sum(tmp_l == i), i) for i in set(tmp_l.flatten())])
+                    tmplabels = tu[-1][1]
+                    if test_labels_block[ii] != tmplabels:
+                        inner_err[j] += 1
+            return_dict[id] = inner_err
+
+        record = []
+        manager = mp.Manager()
+        return_dict = manager.dict()
+
+        for i in range(n_jobs):
+            process = mp.Process(target=worker, args=(i, return_dict))
+            process.start()
+            record.append(process)
+
+        for process in record:
+            process.join()
+
+
+        for PERROR in return_dict.values():
+            err += PERROR
+
+        # print([[p, p.exitcode, p.pid] for p in record], end="")
+
+        del D2
+        del test_labels_block
+        del return_dict
+        del manager
+        print(" | Use time: {:.2f}s".format(time.time()-start_time))
+
+    for j in range(len(Ks)):
+        err[j] = float(err[j]) / float(n)
+    # print("\t".join(["{:.4f}".format(1 - erri) for erri in err]))
+    return err
+
+
 def LCMC_large(X:np.array, mappedX:np.array, Ks:list=[1], block:int=10, n_jobs:int=-1):
     if n_jobs == -1:
         n_jobs = mp.cpu_count()
@@ -187,50 +267,48 @@ def LCMC_large(X:np.array, mappedX:np.array, Ks:list=[1], block:int=10, n_jobs:i
     return L
 
 
-def trustworthiness_large(X:np.array, mappedX:np.array, Ks:list=[1], block:int=10000, n_jobs:int=-1):
-    def worker(outi, ind1, ind2, Ks, return_dict):
-        ranks = np.zeros(np.max(Ks))
-        T = np.zeros(len(Ks))
-        n, d = ind1.shape
-        for j in range(n):
-            for m in range(np.max(Ks)):
-                ranks[m] = np.where(ind1[j, :] == ind2[j][m + 1])[0]
-            ii = 0
-            for k in Ks:
-                ranksi = ranks[:k] - k
-                T[ii] += np.sum(ranksi[ranksi > 0])
-                ii += 1
-        return_dict[outi] = T
-
+def trustworthiness_large(X:np.array, mappedX:np.array, Ks:list=[1], block:int=20000, n_jobs:int=-1):
     if n_jobs == -1:
         n_jobs = mp.cpu_count()
-
-    if block < n_jobs:
-        block = n_jobs * 5
-    n, d = X.shape
-    i_s = [block] * int(n / block) if n % block == 0 else [block] * int(n / block) + [n % block]
-    starti = 0
+    n = X.shape[0]
     T = np.zeros(len(Ks))
-    for i in i_s:
-        endi = starti + i
-        hD = pairwise_distances(X=X[starti:endi, :], Y=X, metric='euclidean', n_jobs=n_jobs) ** 2
-        lD = pairwise_distances(X=mappedX[starti:endi, :], Y=mappedX, metric='euclidean', n_jobs=n_jobs) ** 2
-        starti += i
-        ind1 = hD.argsort(axis=1)
-        ind2 = lD.argsort(axis=1)
+    n_blocks = n // block
+    for j in range(n_blocks):
+        low_X = int(j * n / n_blocks)
+        high_X = int((j + 1) * n / n_blocks)
+        num_samples = X[low_X: high_X, :].shape[0]
 
-        splits = n_jobs
-        # ranks = multicore_func(ind1, ind2, n_jobs=n_jobs, Ks=Ks)
-        chunk = block // splits
-        chunk0 = [ind1[i * chunk:(i + 1) * chunk] for i in range(splits)]
-        chunk1 = [ind2[i * chunk:(i + 1) * chunk] for i in range(splits)]
+        hD = pairwise_distances(X=X[low_X: high_X, :], Y=X, metric='euclidean', n_jobs=n_jobs) ** 2
+        lD = pairwise_distances(X=mappedX[low_X: high_X, :], Y=mappedX, metric='euclidean', n_jobs=n_jobs) ** 2
+
+        def worker(id, return_dict):
+            low_pos = int(id * num_samples / n_jobs)
+            high_pos = int((id + 1) * num_samples / n_jobs)
+            if high_pos > num_samples:
+                high_pos = num_samples
+            ranks = np.zeros(np.max(Ks))
+            innerT = np.zeros(len(Ks))
+            ind1 = hD[low_pos:high_pos, :].argsort(axis=1)
+            ind2 = lD[low_pos:high_pos, :].argsort(axis=1)
+            for j in range(high_pos - low_pos):
+                for m in range(np.max(Ks)):
+                    ranks[m] = np.where(ind1[j, :] == ind2[j][m + 1])[0]
+                ii = 0
+                for k in Ks:
+                    ranksi = ranks[:k] - k
+                    innerT[ii] += np.sum(ranksi[ranksi > 0])
+                    ii += 1
+            return_dict[id] = innerT
+
+        # ind1 = hD.argsort(axis=1)
+        # ind2 = lD.argsort(axis=1)
 
         record = []
         manager = mp.Manager()
         return_dict = manager.dict()
 
         for i in range(n_jobs):
-            process = mp.Process(target=worker, args=(i, chunk0[i], chunk1[i], Ks, return_dict))
+            process = mp.Process(target=worker, args=(i, return_dict))
             process.start()
             record.append(process)
         for process in record:
@@ -238,6 +316,10 @@ def trustworthiness_large(X:np.array, mappedX:np.array, Ks:list=[1], block:int=1
 
         for PT in return_dict.values():
             T += PT
+
+        for process in record:
+            process.terminate()
+            del process
 
     ii = 0
     for k in Ks:
